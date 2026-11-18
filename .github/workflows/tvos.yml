@@ -18,6 +18,15 @@ jobs:
         run: |
           set -o pipefail
           bash tv/build.sh 2>&1 | tee build.log
+      - name: Read version
+        id: v
+        run: echo "tag=v$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+      - name: Attach IPA to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          files: build/HangulByeolbam-${{ steps.v.outputs.tag }}.ipa
       - uses: actions/upload-artifact@v4
         with:
           name: HangulByeolbam-ipa
