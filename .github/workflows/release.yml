@@ -1,0 +1,22 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package
+        run: |
+          mkdir -p dist/hangul-byeolbam
+          cp index.html dist/hangul-byeolbam/
+          cp -r img dist/hangul-byeolbam/img
+          cd dist && zip -r ../hangul-byeolbam-${GITHUB_REF_NAME}.zip hangul-byeolbam
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: hangul-byeolbam-${{ github.ref_name }}.zip
+          generate_release_notes: true
