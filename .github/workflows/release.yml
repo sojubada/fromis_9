@@ -29,3 +29,20 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: hangul-byeolbam-${{ steps.v.outputs.tag }}.zip
           generate_release_notes: true
+  ipa:
+    needs: release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version
+        id: v
+        run: echo "tag=v$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+      - name: Install ldid
+        run: brew install ldid || true
+      - name: Build tvOS IPA
+        run: bash tv/build.sh
+      - name: Attach IPA to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          files: build/HangulByeolbam-${{ steps.v.outputs.tag }}.ipa
