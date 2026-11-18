@@ -7,7 +7,7 @@ HTML 한 장으로 돌아갑니다. 방향키·엔터·게임패드로 조작하
 ## 실행
 
 - **웹**: GitHub Pages가 켜져 있으면 `https://sojubada.github.io/fromis_9/` 에서 바로 실행됩니다. (저장소 Settings → Pages → Source 를 *GitHub Actions* 로 선택)
-- **오프라인**: Releases 의 zip 을 풀고 `index.html` 을 크롬/엣지로 엽니다.
+- **오프라인**: Releases 의 zip 을 풀고 `index.html` 을 크롬/엣지로 엽니다. (새 릴리즈: `VERSION` 숫자를 올려 main 에 푸시하면 자동 생성)
 
 ## 기능
 

@@ -1,7 +1,10 @@
 name: Release
+# VERSION 파일의 숫자를 올려서 main 에 푸시하면 v<버전> 태그와 릴리즈(zip 포함)가 자동으로 만들어집니다.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: [VERSION]
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -9,14 +12,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Read version
+        id: v
+        run: echo "tag=v$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
       - name: Package
         run: |
           mkdir -p dist/hangul-byeolbam
           cp index.html dist/hangul-byeolbam/
           cp -r img dist/hangul-byeolbam/img
-          cd dist && zip -r ../hangul-byeolbam-${GITHUB_REF_NAME}.zip hangul-byeolbam
+          (cd dist && zip -qr "../hangul-byeolbam-${{ steps.v.outputs.tag }}.zip" hangul-byeolbam)
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: hangul-byeolbam-${{ github.ref_name }}.zip
+          tag_name: ${{ steps.v.outputs.tag }}
+          name: 한글 별밤 탐험 ${{ steps.v.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          files: hangul-byeolbam-${{ steps.v.outputs.tag }}.zip
           generate_release_notes: true
