@@ -29,7 +29,10 @@ button.s{background:#ffffff22;color:#fff}
 <h2>2. 올려 둔 사진</h2>
 <div class="box"><div class="grid" id="list"></div><p class="help" id="none" hidden>아직 사진이 없어요.</p></div>
 
-<h2>3. 클로드 API 키</h2>
+<h2>3. 아이 이름</h2>
+<div class="box"><input type="text" id="nm" maxlength="8" placeholder="예: 하준"><div><button id="ns">저장</button></div><div id="nmsg" class="help"></div></div>
+
+<h2>4. 클로드 API 키</h2>
 <div class="box">
   <p class="help">키는 이 Apple TV 안에만 저장되고, 클로드 서버로만 보내집니다. 입력하면 클로드가 문제를 고르고 학습 보고서를 씁니다.</p>
   <input type="password" id="key" placeholder="sk-ant-로 시작하는 키" autocomplete="off">
@@ -51,7 +54,7 @@ function refresh(){
       b.onclick=function(){if(confirm("이 사진을 지울까요?"))fetch("/api/delete?f="+encodeURIComponent(p.f),{method:"POST"}).then(refresh);};
       d.appendChild(im);d.appendChild(c);d.appendChild(b);g.appendChild(d);});
   });
-  fetch("/api/info").then(function(r){return r.json();}).then(function(i){$("kmsg").textContent=i.hasKey?"키가 저장되어 있어요.":"키가 아직 없어요.";});
+  fetch("/api/info").then(function(r){return r.json();}).then(function(i){if(i.name&&!$("nm").value)$("nm").value=i.name;$("kmsg").textContent=i.hasKey?"키가 저장되어 있어요.":"키가 아직 없어요.";});
 }
 function shrink(file){
   return new Promise(function(res,rej){
@@ -74,6 +77,7 @@ $("up").onclick=function(){
 $("ks").onclick=function(){var k=$("key").value.trim();
   if(!/^sk-ant-[A-Za-z0-9_\-]{20,}$/.test(k)){$("kmsg").textContent="키 모양이 맞지 않아요.";return;}
   fetch("/api/config",{method:"POST",body:JSON.stringify({key:k})}).then(function(){$("key").value="";refresh();$("kmsg").textContent="저장했어요. TV에서 앱을 다시 열면 적용돼요.";});};
+$("ns").onclick=function(){fetch("/api/config",{method:"POST",body:JSON.stringify({name:$("nm").value.trim()})}).then(function(){$("nmsg").textContent="저장했어요. TV에서 앱을 다시 열면 적용돼요.";});};
 $("kd").onclick=function(){fetch("/api/config",{method:"POST",body:JSON.stringify({key:""})}).then(function(){refresh();$("kmsg").textContent="키를 지웠어요.";});};
 refresh();
 </script></body></html>

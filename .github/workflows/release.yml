@@ -20,6 +20,7 @@ jobs:
           mkdir -p dist/hangul-byeolbam
           cp index.html dist/hangul-byeolbam/
           cp -r img dist/hangul-byeolbam/img
+          cp -r fonts dist/hangul-byeolbam/fonts
           (cd dist && zip -qr "../hangul-byeolbam-${{ steps.v.outputs.tag }}.zip" hangul-byeolbam)
       - name: Publish release
         uses: softprops/action-gh-release@v2

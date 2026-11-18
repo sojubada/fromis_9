@@ -32,6 +32,11 @@ final class HostViewController: UIViewController {
         if let w = makeWebView() {
             w.frame = view.bounds
             w.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            // 입력은 모두 이 화면이 받아서 웹앱(window.tvKey)으로 넘긴다
+            w.isUserInteractionEnabled = false
+            if w.responds(to: NSSelectorFromString("scrollView")), let sv = w.value(forKey: "scrollView") as? UIScrollView { sv.isScrollEnabled = false; sv.bounces = false }
+            w.isOpaque = false
+            w.backgroundColor = view.backgroundColor
             view.addSubview(w)
             web = w
             let url = URL(string: "http://127.0.0.1:\(Server.shared.port)/index.html")!
@@ -80,11 +85,12 @@ final class HostViewController: UIViewController {
                     typealias InitFn = @convention(c) (AnyObject, Selector, CGRect, AnyObject) -> Unmanaged<AnyObject>
                     let fn = unsafeBitCast(raw.method(for: sel), to: InitFn.self)
                     let v = fn(raw, sel, UIScreen.main.bounds, cfg).takeUnretainedValue()
-                    if let view = v as? UIView { return view }
+                    if let view = v as? UIView { Server.shared.engine = "WKWebView"; return view }
                 }
             }
         }
         if let cls = NSClassFromString("UIWebView") as? UIView.Type {
+            Server.shared.engine = "UIWebView"
             return cls.init(frame: UIScreen.main.bounds)
         }
         return nil

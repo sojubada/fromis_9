@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import AVFoundation
+import UIKit
 
 struct Req {
     var method = ""
@@ -16,6 +17,8 @@ final class Server {
     static let shared = Server()
     private(set) var port: UInt16 = 8765
     var screen = "home"
+    var engine = "?"
+    var lastLog = ""
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "hangul.server")
     private let speech = AVSpeechSynthesizer()
@@ -105,12 +108,15 @@ final class Server {
         case ("GET", "/setup"):
             file(c, "www/setup.html")
         case ("GET", "/api/info"):
-            json(c, ["ip": Server.localIP(), "port": Int(port), "photos": Store.photos().count, "hasKey": !Store.key().isEmpty] as [String: Any])
+            json(c, ["ip": Server.localIP(), "port": Int(port), "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "os": UIDevice.current.systemVersion] as [String: Any])
         case ("GET", "/api/config"):
-            if local { json(c, ["key": Store.key()]) } else { reply(c, 403, "text/plain", Data("forbidden".utf8)) }
+            if local { json(c, ["key": Store.key(), "name": Store.name()]) } else { reply(c, 403, "text/plain", Data("forbidden".utf8)) }
         case ("POST", "/api/config"):
-            if let o = (try? JSONSerialization.jsonObject(with: r.body)) as? [String: Any], let k = o["key"] as? String {
-                Store.setKey(k.trimmingCharacters(in: .whitespacesAndNewlines))
+            if let o = (try? JSONSerialization.jsonObject(with: r.body)) as? [String: Any] {
+                var add: [String: Any] = [:]
+                if let k = o["key"] as? String { add["key"] = k.trimmingCharacters(in: .whitespacesAndNewlines) }
+                if let n = o["name"] as? String { add["name"] = String(n.trimmingCharacters(in: .whitespacesAndNewlines).prefix(8)) }
+                Store.merge(add)
                 json(c, ["ok": true])
             } else { reply(c, 400, "text/plain", Data("bad".utf8)) }
         case ("GET", "/api/photos"):
@@ -138,11 +144,16 @@ final class Server {
             let t = r.query["t"] ?? ""
             if !t.isEmpty && local { say(t) }
             json(c, ["ok": true])
+        case ("POST", "/api/log"):
+            lastLog = String(data: r.body.prefix(2000), encoding: .utf8) ?? ""
+            json(c, ["ok": true])
+        case ("GET", "/api/log"):
+            json(c, ["engine": engine, "os": UIDevice.current.systemVersion, "log": lastLog])
         case ("POST", "/api/screen"):
             screen = r.query["s"] ?? "home"
             json(c, ["ok": true])
         default:
-            if r.method == "GET" && r.path.hasPrefix("/img/") {
+            if r.method == "GET" && (r.path.hasPrefix("/img/") || r.path.hasPrefix("/fonts/")) {
                 file(c, "www" + r.path)
             } else if r.method == "GET" && r.path.hasPrefix("/photos/") {
                 let f = String(r.path.dropFirst("/photos/".count))
@@ -186,6 +197,7 @@ final class Server {
         case "jpg", "jpeg": return "image/jpeg"
         case "webp": return "image/webp"
         case "gif": return "image/gif"
+        case "ttf": return "font/ttf"
         default: return "application/octet-stream"
         }
     }

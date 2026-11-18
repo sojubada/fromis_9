@@ -35,14 +35,18 @@ enum Store {
             }
     }
 
-    static func key() -> String {
+    static func config() -> [String: Any] {
         guard let d = try? Data(contentsOf: configURL),
-              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return "" }
-        return (o["key"] as? String) ?? ""
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
+        return o
     }
 
-    static func setKey(_ k: String) {
-        let o: [String: Any] = ["key": k]
+    static func key() -> String { (config()["key"] as? String) ?? "" }
+    static func name() -> String { (config()["name"] as? String) ?? "" }
+
+    static func merge(_ add: [String: Any]) {
+        var o = config()
+        for (k, v) in add where k == "key" || k == "name" { o[k] = v }
         if let d = try? JSONSerialization.data(withJSONObject: o) { try? d.write(to: configURL) }
     }
 }

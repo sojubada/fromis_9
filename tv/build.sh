@@ -12,6 +12,7 @@ xcrun --sdk appletvos swiftc -swift-version 5 -parse-as-library -O \
   -target arm64-apple-tvos15.0 -sdk "$SDK" \
   tv/Sources/*.swift -o "$APP/HangulByeolbam"
 cp index.html "$APP/www/"
+cp -r fonts "$APP/www/fonts"
 cp -r img "$APP/www/img"
 cp tv/www/setup.html "$APP/www/"
 sed "s/__VERSION__/$VER/g" tv/Info.plist > "$APP/Info.plist"

@@ -2,7 +2,7 @@ name: Build tvOS IPA
 on:
   push:
     branches: [main]
-    paths: ['tv/**', 'index.html', 'img/**', 'VERSION', '.github/workflows/tvos.yml']
+    paths: ['tv/**', 'index.html', 'img/**', 'fonts/**', 'VERSION', '.github/workflows/tvos.yml']
   workflow_dispatch:
 permissions:
   contents: write
