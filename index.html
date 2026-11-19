@@ -753,7 +753,7 @@ function showCard(){
   var it=R.items[R.i];cur={it:it,t0:Date.now(),wrong:false,hint:false,heard:"",done:false,picks:[]};
   var stage=$("stage"),bar=$("bar");stage.textContent="";bar.textContent="";bar.classList.remove("find");$("heard").textContent="";$("pop").className="pop";$("merge").hidden=true;
   stage.className="";void stage.offsetWidth;stage.className="enter";
-  var intro={read:"소리 내서 읽어 봐!",picture:"그림에 맞는 낱말을 골라 봐!",build:"두 글자를 합치면 뭐가 될까?",missing:"빠진 글자를 찾아 봐!",order:"글자를 순서대로 눌러 봐!",find:"같은 글자를 모두 찾아 봐!"}[it.kind];
+  var intro={read:"큰 소리로 읽어 봐요!",picture:"그림에 맞는 낱말을 골라 봐요!",build:"두 글자를 합치면 무슨 글자가 될까요?",missing:"빠진 글자를 찾아 봐요!",order:"글자를 순서대로 눌러 봐요!",find:"같은 글자를 모두 찾아 봐요!",listen:"잘 듣고 골라 봐요!"}[it.kind];
   if(intro&&!R.said[it.kind]&&!R.challenge){R.said[it.kind]=1;setTimeout(function(){speak(intro);},250);}
   if(it.kind==="read"){
     var w=el("div","word",it.t);w.style.fontSize=sizeFor(it.t);stage.appendChild(w);
@@ -952,7 +952,7 @@ $("next").addEventListener("click",function(){if((R&&R.challenge)||overLimit())r
 $("toHome").addEventListener("click",renderHome);
 
 /* ---------- 누적 학습 기록과 분석 ---------- */
-var VERSION="1.3.0";
+var VERSION="1.3.1";
 var JONG=["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
 var KIND_CODE={read:"r",listen:"l",picture:"p",build:"b",missing:"m",order:"o",find:"f"}, KIND_NAME={r:"읽기",l:"듣고 고르기",p:"그림 낱말",b:"글자 합치기",m:"빈칸 채우기",o:"순서 맞추기",f:"글자 찾기"};
 var GOAL=2, LOG_MAX=1500;

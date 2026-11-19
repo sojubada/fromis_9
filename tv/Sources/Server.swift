@@ -112,7 +112,7 @@ final class Server {
         case ("GET", "/setup"):
             file(c, "www/setup.html")
         case ("GET", "/api/info"):
-            json(c, ["ip": Server.localIP(), "port": Int(port), "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "voice": (voice.map { "\($0.name) q\($0.quality.rawValue)" } ?? "없음"), "os": UIDevice.current.systemVersion] as [String: Any])
+            json(c, ["ip": Server.localIP(), "port": Int(port), "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine,  "os": UIDevice.current.systemVersion] as [String: Any])
         case ("GET", "/api/config"):
             if local { json(c, ["key": Store.key(), "name": Store.name()]) } else { reply(c, 403, "text/plain", Data("forbidden".utf8)) }
         case ("POST", "/api/config"):
@@ -149,7 +149,7 @@ final class Server {
             if !t.isEmpty && local { say(t, queue: r.query["q"] == "1") }
             json(c, ["ok": true])
         case ("GET", "/api/diag"):
-            json(c, ["base": Store.base.path, "problems": Store.diag, "lastError": lastError, "hits": hits, "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "os": UIDevice.current.systemVersion] as [String: Any])
+            json(c, ["base": Store.base.path, "problems": Store.diag, "lastError": lastError, "hits": hits, "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "voice": (voice.map { "\($0.name) q\($0.quality.rawValue)" } ?? "없음"), "os": UIDevice.current.systemVersion] as [String: Any])
         case ("POST", "/api/log"):
             lastLog = String(data: r.body.prefix(2000), encoding: .utf8) ?? ""
             json(c, ["ok": true])
