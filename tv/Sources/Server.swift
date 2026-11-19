@@ -112,7 +112,7 @@ final class Server {
         case ("GET", "/setup"):
             file(c, "www/setup.html")
         case ("GET", "/api/info"):
-            json(c, ["ip": Server.localIP(), "port": Int(port), "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "os": UIDevice.current.systemVersion] as [String: Any])
+            json(c, ["ip": Server.localIP(), "port": Int(port), "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "voice": (voice.map { "\($0.name) q\($0.quality.rawValue)" } ?? "없음"), "os": UIDevice.current.systemVersion] as [String: Any])
         case ("GET", "/api/config"):
             if local { json(c, ["key": Store.key(), "name": Store.name()]) } else { reply(c, 403, "text/plain", Data("forbidden".utf8)) }
         case ("POST", "/api/config"):
@@ -146,7 +146,7 @@ final class Server {
             json(c, ["ok": true])
         case ("GET", "/api/speak"):
             let t = r.query["t"] ?? ""
-            if !t.isEmpty && local { say(t) }
+            if !t.isEmpty && local { say(t, queue: r.query["q"] == "1") }
             json(c, ["ok": true])
         case ("GET", "/api/diag"):
             json(c, ["base": Store.base.path, "problems": Store.diag, "lastError": lastError, "hits": hits, "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "os": UIDevice.current.systemVersion] as [String: Any])
@@ -172,12 +172,28 @@ final class Server {
         }
     }
 
-    private func say(_ t: String) {
+    /// 한국어 음성 중 가장 좋은 것(프리미엄 > 향상 > 기본, 여성 '유나' 우선)
+    static func bestVoice() -> AVSpeechSynthesisVoice? {
+        let ko = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("ko") }
+        func score(_ v: AVSpeechSynthesisVoice) -> Int {
+            var s = v.quality.rawValue * 10
+            if v.name.contains("Yuna") || v.name.contains("유나") { s += 15 }
+            return s
+        }
+        return ko.max { score($0) < score($1) } ?? AVSpeechSynthesisVoice(language: "ko-KR")
+    }
+    lazy var voice: AVSpeechSynthesisVoice? = Server.bestVoice()
+
+    private func say(_ t: String, queue: Bool) {
         DispatchQueue.main.async {
             let u = AVSpeechUtterance(string: t)
-            u.voice = AVSpeechSynthesisVoice(language: "ko-KR")
-            u.rate = 0.4
-            self.speech.stopSpeaking(at: .immediate)
+            u.voice = self.voice
+            u.rate = 0.42
+            u.pitchMultiplier = 1.12
+            u.volume = 1.0
+            u.preUtteranceDelay = 0.05
+            u.postUtteranceDelay = 0.12
+            if !queue { self.speech.stopSpeaking(at: .immediate) }
             self.speech.speak(u)
         }
     }

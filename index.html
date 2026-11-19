@@ -413,12 +413,37 @@ function save(){
 
 /* ---------- 소리 ---------- */
 function hasVoice(){return !!cap.tts||NATIVE||("speechSynthesis" in window);}
-function speak(text){
-  if(cap.listening)return;
-  if(NATIVE){nget("/api/speak?k="+TOK+"&t="+encodeURIComponent(text)).catch(function(){});return;}
-  if(cap.tts){cap.tts.speak(text,{language:"ko",rate:0.85}).catch(function(){});return;}
-  try{var u=new SpeechSynthesisUtterance(text);u.lang="ko-KR";u.rate=0.8;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}
+/* ---------- 목소리: 상냥하고 또렷하게 ---------- */
+var JAMO_SAY={"ㄱ":"기역","ㄴ":"니은","ㄷ":"디귿","ㄹ":"리을","ㅁ":"미음","ㅂ":"비읍","ㅅ":"시옷","ㅇ":"이응","ㅈ":"지읒","ㅊ":"치읓","ㅋ":"키읔","ㅌ":"티읕","ㅍ":"피읖","ㅎ":"히읗",
+  "ㅏ":"아","ㅑ":"야","ㅓ":"어","ㅕ":"여","ㅗ":"오","ㅛ":"요","ㅜ":"우","ㅠ":"유","ㅡ":"으","ㅣ":"이","ㅐ":"애","ㅔ":"에"};
+var PRAISE=["참 잘했어요!","우와, 멋져요!","정답이에요!","대단해요!","최고예요!","잘 읽었어요!","와, 똑똑해요!"];
+var CHEER_WRONG=["괜찮아요, 천천히 해 봐요.","괜찮아요, 다시 해 봐요.","조금만 더 힘내요!"];
+function voiceText(t){
+  t=String(t);
+  if(JAMO_SAY[t])return JAMO_SAY[t];
+  if(/^[가-힣]$/.test(t))return t+", "+t;
+  return t.replace(/…/g,",").replace(/\.\.\./g,",");
 }
+var webVoice=null,webVoiceTried=false;
+function pickWebVoice(){
+  try{
+    var vs=speechSynthesis.getVoices().filter(function(v){return /^ko/i.test(v.lang);});if(!vs.length)return null;
+    function rank(v){var n=v.name.toLowerCase();return (/natural|premium|enhanced|neural|online/.test(n)?40:0)+(/yuna|유나|sun-?hi|선희|heami|google/.test(n)?25:0)+(/minsu|male|injoon/.test(n)?-30:0);}
+    return vs.sort(function(a,b){return rank(b)-rank(a);})[0];
+  }catch(e){return null;}
+}
+try{if("speechSynthesis" in window)speechSynthesis.onvoiceschanged=function(){webVoice=pickWebVoice();};}catch(e){}
+var speakChain=Promise.resolve();
+function speak(text,opt){
+  if(cap.listening)return;
+  var q=opt&&opt.q,s=voiceText(text);
+  if(NATIVE){speakChain=speakChain.then(function(){return nget("/api/speak?k="+TOK+"&q="+(q?1:0)+"&t="+encodeURIComponent(s));}).catch(function(){});return;}
+  if(cap.tts){cap.tts.speak(s,{language:"ko",rate:0.8}).catch(function(){});return;}
+  try{if(!webVoiceTried){webVoiceTried=true;webVoice=pickWebVoice();}
+    var u=new SpeechSynthesisUtterance(s);u.lang="ko-KR";if(webVoice)u.voice=webVoice;u.rate=0.78;u.pitch=1.15;
+    if(!q)speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}
+}
+function speakSeq(arr){arr.forEach(function(s,i){speak(s,{q:i>0});});}
 /* ---------- 효과음 합성기 (파일 없이 Web Audio) ---------- */
 var actx=null,master=null;
 function ac(){try{if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)();master=actx.createGain();master.gain.value=0.5;master.connect(actx.destination);}if(actx.state==="suspended")actx.resume();return actx;}catch(e){return null;}}
@@ -819,6 +844,7 @@ function answer(ok){
   if(finished){var bi=S.builds[R.world];bi.i--;var keep=bi.f;bi.f=buildInfo(R.world).total;renderBuild(pb,R.world,0);bi.f=keep;bi.i++;}
   $("popText").textContent=doChant?"":finished?(WORLDS[R.world].ic+" "+finished+" 완성!"):ok?(it.e?it.e+" "+it.t:it.t):it.t+" — 같이 읽어 볼까?";
   if(!doChant&&(it.kind!=="listen"||!ok))setTimeout(function(){speak(it.t);},ok?250:100);
+  if(!doChant&&!finished&&!R.challenge)setTimeout(function(){var L=ok?PRAISE:CHEER_WRONG;speak(L[rnd(L.length)],{q:true});},ok?700:600);
   var wait=finished?2800:doChant?2700:ok?(R.challenge?700:1600):2600;
   function nextCard(){R.i++;if(R.i<R.items.length&&!(R.challenge&&Date.now()-R.t0>CHALLENGE_SEC*1000))showCard();else endRound();}
   var goodNow=R.results.filter(function(x){return x.ok;}).length;
@@ -926,7 +952,7 @@ $("next").addEventListener("click",function(){if((R&&R.challenge)||overLimit())r
 $("toHome").addEventListener("click",renderHome);
 
 /* ---------- 누적 학습 기록과 분석 ---------- */
-var VERSION="1.2.1";
+var VERSION="1.3.0";
 var JONG=["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
 var KIND_CODE={read:"r",listen:"l",picture:"p",build:"b",missing:"m",order:"o",find:"f"}, KIND_NAME={r:"읽기",l:"듣고 고르기",p:"그림 낱말",b:"글자 합치기",m:"빈칸 채우기",o:"순서 맞추기",f:"글자 찾기"};
 var GOAL=2, LOG_MAX=1500;
@@ -1269,7 +1295,7 @@ function chant(t){
   C.textContent=CHO[d.c];J.textContent=JUNG[d.j];$("mR").textContent=t;
   C.className="";J.className="";m.className="merge";m.hidden=false;
   var cs=CHO[d.c]==="ㅇ"?"":compose(d.c,JUNG.indexOf("ㅡ")),vs=compose(CHO.indexOf("ㅇ"),d.j);
-  speak(cs?cs+"… "+vs+"… "+t+"!":t+"!");
+  if(cs)speakSeq([cs,vs,t+"!"]);else speakSeq([vs,t+"!"]);
   setTimeout(function(){C.className="lit";tone(523,0.18,{type:"triangle",vol:0.14});},120);
   setTimeout(function(){C.className="";J.className="lit";tone(659,0.18,{type:"triangle",vol:0.14});},cs?750:300);
   setTimeout(function(){m.className="merge join";SFX.good(4);confettiAt(m,36);},cs?1350:800);
