@@ -16,6 +16,16 @@ cp -r fonts "$APP/www/fonts"
 cp -r img "$APP/www/img"
 cp tv/www/setup.html "$APP/www/"
 sed "s/__VERSION__/$VER/g" tv/Info.plist > "$APP/Info.plist"
+# 앱 아이콘·탑 셸프 (실패해도 빌드는 계속)
+if xcrun actool tv/icon/Assets.xcassets --compile "$APP" --platform appletvos \
+     --minimum-deployment-target 15.0 --target-device tv \
+     --app-icon "App Icon & Top Shelf Image" --output-partial-info-plist "$OUT/icon.plist" \
+     --errors --warnings --notices; then
+  /usr/libexec/PlistBuddy -c "Merge $OUT/icon.plist" "$APP/Info.plist" && echo "ICON: OK"
+  ls -la "$APP" | grep -i -E "car|png" || true
+else
+  echo "ICON: actool failed"
+fi
 if command -v ldid >/dev/null 2>&1; then ldid -S "$APP/HangulByeolbam" || true; fi
 (cd "$OUT" && zip -qry "HangulByeolbam-v$VER.ipa" Payload)
 ls -la "$OUT"
