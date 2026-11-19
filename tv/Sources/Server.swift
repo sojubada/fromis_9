@@ -18,6 +18,9 @@ final class Server {
     private(set) var port: UInt16 = 8765
     var screen = "home"
     var engine = "?"
+    let token = UUID().uuidString
+    var hits = 0
+    var lastError = ""
     var lastLog = ""
     private var listener: NWListener?
     private let queue = DispatchQueue(label: "hangul.server")
@@ -101,7 +104,8 @@ final class Server {
     }
 
     private func route(_ r: Req, _ c: NWConnection) {
-        let local = isLocal(c)
+        hits += 1
+        let local = isLocal(c) || r.query["k"] == token
         switch (r.method, r.path) {
         case ("GET", "/"), ("GET", "/index.html"):
             file(c, "www/index.html")
@@ -133,7 +137,7 @@ final class Server {
                 caps[name] = cap.isEmpty ? "우리 가족 사진" : cap
                 Store.saveCaptions(caps)
                 json(c, ["ok": true, "f": name])
-            } catch { reply(c, 400, "text/plain", Data("write failed".utf8)) }
+            } catch { lastError = error.localizedDescription; reply(c, 500, "text/plain", Data("저장 실패: \(error.localizedDescription)".utf8)) }
         case ("POST", "/api/delete"):
             let f = r.query["f"] ?? ""
             if f.isEmpty || f.contains("/") || f.contains("..") { reply(c, 400, "text/plain", Data("bad".utf8)); return }
@@ -144,6 +148,8 @@ final class Server {
             let t = r.query["t"] ?? ""
             if !t.isEmpty && local { say(t) }
             json(c, ["ok": true])
+        case ("GET", "/api/diag"):
+            json(c, ["base": Store.base.path, "problems": Store.diag, "lastError": lastError, "hits": hits, "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "os": UIDevice.current.systemVersion] as [String: Any])
         case ("POST", "/api/log"):
             lastLog = String(data: r.body.prefix(2000), encoding: .utf8) ?? ""
             json(c, ["ok": true])
@@ -203,7 +209,7 @@ final class Server {
     }
 
     private func reply(_ c: NWConnection, _ code: Int, _ type: String, _ body: Data) {
-        let names: [Int: String] = [200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found"]
+        let names: [Int: String] = [200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 500: "Server Error"]
         let head = "HTTP/1.1 \(code) \(names[code] ?? "OK")\r\nContent-Type: \(type)\r\nContent-Length: \(body.count)\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
         var out = Data(head.utf8)
         out.append(body)

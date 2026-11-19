@@ -39,7 +39,7 @@ final class HostViewController: UIViewController {
             w.backgroundColor = view.backgroundColor
             view.addSubview(w)
             web = w
-            let url = URL(string: "http://127.0.0.1:\(Server.shared.port)/index.html")!
+            let url = URL(string: "http://127.0.0.1:\(Server.shared.port)/index.html?k=\(Server.shared.token)")!
             let sel = NSSelectorFromString("loadRequest:")
             if w.responds(to: sel) { _ = w.perform(sel, with: URLRequest(url: url) as NSURLRequest) }
         } else {

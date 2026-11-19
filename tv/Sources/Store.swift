@@ -1,15 +1,34 @@
 import Foundation
 
-/// 앱 전용 저장소(Documents). 사진은 Documents/photos, 설정은 Documents/config.json
+/// 앱 저장소. tvOS 는 Documents 에 쓸 수 없는 경우가 많아, 쓸 수 있는 폴더를 찾아 쓴다.
+/// 이름·API 키는 UserDefaults(재부팅·앱 재시작 후에도 유지)에 저장한다.
 enum Store {
-    static let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-    static let photosDir = docs.appendingPathComponent("photos", isDirectory: true)
-    static let indexURL = photosDir.appendingPathComponent("index.json")
-    static let configURL = docs.appendingPathComponent("config.json")
+    static let fm = FileManager.default
+    static let docs = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    static let caches = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+    static var base: URL = caches
+    static var diag = ""
     static let exts = ["jpg", "jpeg", "png", "webp", "gif"]
+    static var photosDir: URL { base.appendingPathComponent("photos", isDirectory: true) }
+    static var indexURL: URL { photosDir.appendingPathComponent("index.json") }
+
+    private static func writable(_ dir: URL) -> Bool {
+        let p = dir.appendingPathComponent("photos", isDirectory: true)
+        do {
+            try fm.createDirectory(at: p, withIntermediateDirectories: true)
+            let t = p.appendingPathComponent(".probe")
+            try Data("1".utf8).write(to: t)
+            try? fm.removeItem(at: t)
+            return true
+        } catch {
+            diag += "\(dir.lastPathComponent) 쓰기 실패(\(error.localizedDescription)); "
+            return false
+        }
+    }
 
     static func setup() {
-        try? FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
+        if writable(docs) { base = docs } else if writable(caches) { base = caches }
+        else { diag += "저장할 폴더가 없음; " }
     }
 
     static func captions() -> [String: String] {
@@ -22,9 +41,8 @@ enum Store {
         if let d = try? JSONSerialization.data(withJSONObject: c) { try? d.write(to: indexURL) }
     }
 
-    /// 폴더에 직접 넣은 파일도 목록에 나온다. 제목은 index.json, 없으면 파일 이름.
     static func photos() -> [[String: String]] {
-        let files = (try? FileManager.default.contentsOfDirectory(atPath: photosDir.path)) ?? []
+        let files = (try? fm.contentsOfDirectory(atPath: photosDir.path)) ?? []
         let caps = captions()
         return files
             .filter { exts.contains(($0 as NSString).pathExtension.lowercased()) }
@@ -35,18 +53,14 @@ enum Store {
             }
     }
 
-    static func config() -> [String: Any] {
-        guard let d = try? Data(contentsOf: configURL),
-              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
-        return o
-    }
-
+    static func config() -> [String: Any] { UserDefaults.standard.dictionary(forKey: "hb_config") ?? [:] }
     static func key() -> String { (config()["key"] as? String) ?? "" }
     static func name() -> String { (config()["name"] as? String) ?? "" }
 
     static func merge(_ add: [String: Any]) {
         var o = config()
         for (k, v) in add where k == "key" || k == "name" { o[k] = v }
-        if let d = try? JSONSerialization.data(withJSONObject: o) { try? d.write(to: configURL) }
+        UserDefaults.standard.set(o, forKey: "hb_config")
+        UserDefaults.standard.synchronize()
     }
 }

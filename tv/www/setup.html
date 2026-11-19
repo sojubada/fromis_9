@@ -40,6 +40,7 @@ button.s{background:#ffffff22;color:#fff}
   <div id="kmsg" class="help"></div>
 </div>
 
+<p class="help" id="diag"></p>
 <script>
 function $(i){return document.getElementById(i);}
 function say(t,ok){var m=$("msg");m.textContent=t;m.style.color=ok===false?"#ff9a8a":"#9be3a8";}
@@ -68,16 +69,24 @@ function shrink(file){
 }
 $("up").onclick=function(){
   var fs=[].slice.call($("files").files);if(!fs.length){say("사진을 먼저 골라 주세요.",false);return;}
-  var cap=$("cap").value,n=0,fail=0;$("up").disabled=true;
+  var cap=$("cap").value,n=0,fail=0,why="";$("up").disabled=true;
   fs.reduce(function(p,f,i){return p.then(function(){say((i+1)+"/"+fs.length+" 올리는 중…");
     return shrink(f).then(function(b){return fetch("/upload?cap="+encodeURIComponent(cap),{method:"POST",headers:{"Content-Type":"image/jpeg"},body:b});})
-      .then(function(r){if(r.ok)n++;else fail++;}).catch(function(){fail++;});});},Promise.resolve())
-  .then(function(){$("up").disabled=false;$("files").value="";say(n+"장 올렸어요."+(fail?" ("+fail+"장은 실패했어요)":""),!fail);refresh();});
+      .then(function(r){if(r.ok)n++;else{fail++;return r.text().then(function(x){why=x;});}}).catch(function(e){fail++;why=String(e&&e.message||e);});});},Promise.resolve())
+  .then(function(){$("up").disabled=false;$("files").value="";say(n+"장 올렸어요."+(fail?" ("+fail+"장 실패: "+why+")":""),!fail);refresh();diag();});
 };
 $("ks").onclick=function(){var k=$("key").value.trim();
   if(!/^sk-ant-[A-Za-z0-9_\-]{20,}$/.test(k)){$("kmsg").textContent="키 모양이 맞지 않아요.";return;}
-  fetch("/api/config",{method:"POST",body:JSON.stringify({key:k})}).then(function(){$("key").value="";refresh();$("kmsg").textContent="저장했어요. TV에서 앱을 다시 열면 적용돼요.";});};
-$("ns").onclick=function(){fetch("/api/config",{method:"POST",body:JSON.stringify({name:$("nm").value.trim()})}).then(function(){$("nmsg").textContent="저장했어요. TV에서 앱을 다시 열면 적용돼요.";});};
-$("kd").onclick=function(){fetch("/api/config",{method:"POST",body:JSON.stringify({key:""})}).then(function(){refresh();$("kmsg").textContent="키를 지웠어요.";});};
-refresh();
+  post("/api/config",JSON.stringify({key:k}),$("kmsg"),"저장했어요. TV에서 앱을 껐다 다시 켜면 적용돼요.").then(function(){$("key").value="";});};
+function post(url,body,out,okText){
+  out.style.color="#a9b2dc";out.textContent="보내는 중…";
+  return fetch(url,{method:"POST",body:body}).then(function(r){return r.text().then(function(tx){
+    if(!r.ok)throw new Error(tx||("오류 "+r.status));out.style.color="#9be3a8";out.textContent=okText;diag();});})
+  .catch(function(e){out.style.color="#ff9a8a";out.textContent="실패: "+(e&&e.message?e.message:e)+" (TV 앱이 켜져 있는지 확인해 주세요)";});
+}
+$("ns").onclick=function(){post("/api/config",JSON.stringify({name:$("nm").value.trim()}),$("nmsg"),"저장했어요. TV에서 앱을 껐다 다시 켜면 적용돼요.");};
+$("kd").onclick=function(){post("/api/config",JSON.stringify({key:""}),$("kmsg"),"키를 지웠어요.");};
+function diag(){fetch("/api/diag").then(function(r){return r.json();}).then(function(d){
+  $("diag").textContent="서버 상태 · 저장 위치: "+d.base+" · 사진 "+d.photos+"장 · 이름 "+(d.name||"없음")+" · 키 "+(d.hasKey?"있음":"없음")+(d.problems?" · 문제: "+d.problems:"")+(d.lastError?" · 마지막 오류: "+d.lastError:"");}).catch(function(){$("diag").textContent="TV 앱과 연결되지 않았어요.";});}
+refresh();diag();
 </script></body></html>
