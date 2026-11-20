@@ -148,8 +148,17 @@ final class Server {
             let t = r.query["t"] ?? ""
             if !t.isEmpty && local { say(t, queue: r.query["q"] == "1") }
             json(c, ["ok": true])
+        case ("GET", "/api/tts"):
+            let t = r.query["t"] ?? ""
+            if t.isEmpty || !local { reply(c, 400, "text/plain", Data()); return }
+            DispatchQueue.main.async {
+                let v = self.voice
+                TTSRender.shared.render(t, voice: v) { d in
+                    if let d = d { self.reply(c, 200, "audio/wav", d) } else { self.reply(c, 500, "text/plain", Data("tts failed".utf8)) }
+                }
+            }
         case ("GET", "/api/diag"):
-            json(c, ["base": Store.base.path, "problems": Store.diag, "lastError": lastError, "hits": hits, "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "voice": (voice.map { "\($0.name) q\($0.quality.rawValue)" } ?? "없음"), "os": UIDevice.current.systemVersion] as [String: Any])
+            json(c, ["base": Store.base.path, "problems": Store.diag, "lastError": lastError, "hits": hits, "photos": Store.photos().count, "hasKey": !Store.key().isEmpty, "name": Store.name(), "engine": engine, "tts": TTSRender.shared.lastError, "voice": (voice.map { "\($0.name) q\($0.quality.rawValue)" } ?? "없음"), "os": UIDevice.current.systemVersion] as [String: Any])
         case ("POST", "/api/log"):
             lastLog = String(data: r.body.prefix(2000), encoding: .utf8) ?? ""
             json(c, ["ok": true])
