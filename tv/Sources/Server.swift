@@ -193,8 +193,13 @@ final class Server {
             u.volume = 1.0
             u.preUtteranceDelay = 0.05
             u.postUtteranceDelay = 0.12
-            if !queue { self.speech.stopSpeaking(at: .immediate) }
-            self.speech.speak(u)
+            // 말하는 도중 멈추고 바로 말하면 tvOS 가 새 말을 빠뜨리는 경우가 있어 잠깐 쉬고 말한다
+            if !queue && self.speech.isSpeaking {
+                self.speech.stopSpeaking(at: .immediate)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { self.speech.speak(u) }
+            } else {
+                self.speech.speak(u)
+            }
         }
     }
 

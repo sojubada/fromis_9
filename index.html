@@ -418,10 +418,19 @@ var JAMO_SAY={"ㄱ":"기역","ㄴ":"니은","ㄷ":"디귿","ㄹ":"리을","ㅁ":
   "ㅏ":"아","ㅑ":"야","ㅓ":"어","ㅕ":"여","ㅗ":"오","ㅛ":"요","ㅜ":"우","ㅠ":"유","ㅡ":"으","ㅣ":"이","ㅐ":"애","ㅔ":"에"};
 var PRAISE=["참 잘했어요!","우와, 멋져요!","정답이에요!","대단해요!","최고예요!","잘 읽었어요!","와, 똑똑해요!"];
 var CHEER_WRONG=["괜찮아요, 천천히 해 봐요.","괜찮아요, 다시 해 봐요.","조금만 더 힘내요!"];
+var CNAME={"ㄱ":"기역","ㄲ":"쌍기역","ㄴ":"니은","ㄷ":"디귿","ㄸ":"쌍디귿","ㄹ":"리을","ㅁ":"미음","ㅂ":"비읍","ㅃ":"쌍비읍","ㅅ":"시옷","ㅆ":"쌍시옷","ㅇ":"이응","ㅈ":"지읒","ㅉ":"쌍지읒","ㅊ":"치읓","ㅋ":"키읔","ㅌ":"티읕","ㅍ":"피읖","ㅎ":"히읗"};
+/* "시옷과 으가 만나면, 스!" — 글자가 어떻게 만들어지는지 읽어 준다 */
+function explain(t){
+  if(!/^[가-힣]$/.test(t))return t;
+  var d=decompose(t),cn=CNAME[CHO[d.c]],vn=compose(11,d.j);
+  if(!d.k)return cn+"과, "+vn+"가 만나면, "+t+"!";
+  var kn=CNAME[JONG[d.k]];if(!kn)return t+"!";
+  return cn+", "+vn+", 받침 "+kn+"이 만나면, "+t+"!";
+}
 function voiceText(t){
   t=String(t);
   if(JAMO_SAY[t])return JAMO_SAY[t];
-  if(/^[가-힣]$/.test(t))return t+", "+t;
+  if(/^[가-힣]$/.test(t))return t+"! "+t+"!";
   return t.replace(/…/g,",").replace(/\.\.\./g,",");
 }
 var webVoice=null,webVoiceTried=false;
@@ -765,7 +774,7 @@ function showCard(){
       inp.addEventListener("change",function(){onHeard(inp.value,true);});
       inp.addEventListener("keydown",function(e){if(e.key==="Enter"){onHeard(inp.value,true);e.preventDefault();}});
       bar.appendChild(inp);}
-    if(hasVoice())bar.appendChild(btn("","🔊 들어 보기",function(){cur.hint=true;speak(it.t);}));
+    if(hasVoice())bar.appendChild(btn("","🔊 들어 보기",function(){cur.hint=true;speak(explain(it.t));}));
     var ok=btn("ok","😀 읽었어요",function(){answer(true);});bar.appendChild(ok);
     bar.appendChild(btn("no","🤔 어려워요",function(){answer(false);}));
     focusFirst(first||ok);
@@ -843,9 +852,9 @@ function answer(ok){
   if(doChant)chant(it.t);
   if(finished){var bi=S.builds[R.world];bi.i--;var keep=bi.f;bi.f=buildInfo(R.world).total;renderBuild(pb,R.world,0);bi.f=keep;bi.i++;}
   $("popText").textContent=doChant?"":finished?(WORLDS[R.world].ic+" "+finished+" 완성!"):ok?(it.e?it.e+" "+it.t:it.t):it.t+" — 같이 읽어 볼까?";
-  if(!doChant&&(it.kind!=="listen"||!ok))setTimeout(function(){speak(it.t);},ok?250:100);
+  if(!doChant&&(it.kind!=="listen"||!ok))setTimeout(function(){speak(explain(it.t));},ok?250:100);
   if(!doChant&&!finished&&!R.challenge)setTimeout(function(){var L=ok?PRAISE:CHEER_WRONG;speak(L[rnd(L.length)],{q:true});},ok?700:600);
-  var wait=finished?2800:doChant?2700:ok?(R.challenge?700:1600):2600;
+  var wait=finished?2800:doChant?3800:ok?(R.challenge?700:1600):2600;
   function nextCard(){R.i++;if(R.i<R.items.length&&!(R.challenge&&Date.now()-R.t0>CHALLENGE_SEC*1000))showCard();else endRound();}
   var goodNow=R.results.filter(function(x){return x.ok;}).length;
   var fire=ok&&!R.challenge&&!R.evDone&&!finished&&goodNow===R.evAt;
@@ -952,7 +961,7 @@ $("next").addEventListener("click",function(){if((R&&R.challenge)||overLimit())r
 $("toHome").addEventListener("click",renderHome);
 
 /* ---------- 누적 학습 기록과 분석 ---------- */
-var VERSION="1.3.2";
+var VERSION="1.3.3";
 var JONG=["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
 var KIND_CODE={read:"r",listen:"l",picture:"p",build:"b",missing:"m",order:"o",find:"f"}, KIND_NAME={r:"읽기",l:"듣고 고르기",p:"그림 낱말",b:"글자 합치기",m:"빈칸 채우기",o:"순서 맞추기",f:"글자 찾기"};
 var GOAL=2, LOG_MAX=1500;
@@ -1295,10 +1304,10 @@ function chant(t){
   C.textContent=CHO[d.c];J.textContent=JUNG[d.j];$("mR").textContent=t;
   C.className="";J.className="";m.className="merge";m.hidden=false;
   var cs=CHO[d.c]==="ㅇ"?"":compose(d.c,JUNG.indexOf("ㅡ")),vs=compose(CHO.indexOf("ㅇ"),d.j);
-  if(cs)speakSeq([cs,vs,t+"!"]);else speakSeq([vs,t+"!"]);
-  setTimeout(function(){C.className="lit";tone(523,0.18,{type:"triangle",vol:0.14});},120);
-  setTimeout(function(){C.className="";J.className="lit";tone(659,0.18,{type:"triangle",vol:0.14});},cs?750:300);
-  setTimeout(function(){m.className="merge join";SFX.good(4);confettiAt(m,36);},cs?1350:800);
+  speak(explain(t));
+  setTimeout(function(){C.className="lit";},150);
+  setTimeout(function(){C.className="";J.className="lit";},1100);
+  setTimeout(function(){m.className="merge join";SFX.good(4);confettiAt(m,36);},2100);
 }
 
 /* ---------- 공룡 알 깨기 → 스티커 ---------- */
