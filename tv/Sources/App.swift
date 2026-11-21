@@ -61,6 +61,20 @@ final class HostViewController: UIViewController {
             if let c = n.object as? GCController { self?.bind(c) }
         }
         GCController.controllers().forEach { bind($0) }
+        // 백그라운드에서 돌아오면: 오디오 세션 다시 켜고, 서버 살리고, 웹 소리 되살리기
+        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            try? AVAudioSession.sharedInstance().setCategory(.playback)
+            try? AVAudioSession.sharedInstance().setActive(true)
+            if Server.shared.restartIfNeeded() {
+                let url = URL(string: "http://127.0.0.1:\(Server.shared.port)/index.html?k=\(Server.shared.token)")!
+                if let w = self?.web, w.responds(to: NSSelectorFromString("loadRequest:")) { _ = w.perform(NSSelectorFromString("loadRequest:"), with: URLRequest(url: url) as NSURLRequest) }
+            } else {
+                self?.eval("window.tvResume&&window.tvResume()")
+            }
+        }
+        NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.eval("window.tvPause&&window.tvPause()")
+        }
     }
 
     // MARK: 웹뷰 만들기 (tvOS 에는 공개 WebKit 이 없어 런타임에 불러온다)
@@ -132,6 +146,7 @@ final class HostViewController: UIViewController {
             case .leftArrow: send("left"); handled = true
             case .rightArrow: send("right"); handled = true
             case .select: send("select"); handled = true
+            case .playPause: send("parent"); handled = true
             case .menu:
                 // 첫 화면에서만 앱을 나간다. 그 밖에서는 '뒤로'.
                 if Server.shared.screen != "home" { send("back"); handled = true }

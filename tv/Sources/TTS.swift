@@ -10,9 +10,32 @@ final class TTSRender {
     private var live: [AVSpeechSynthesizer] = []
     var lastError = ""
 
+    private var jobs: [(String, AVSpeechSynthesisVoice?, (Data?) -> Void)] = []
+    private var busy = false
+
+    /// 여러 요청이 한꺼번에 와도 하나씩 차례로 만든다 (동시에 만들면 소리가 섞이거나 빠진다)
     func render(_ text: String, voice: AVSpeechSynthesisVoice?, done: @escaping (Data?) -> Void) {
         DispatchQueue.main.async {
             if let d = self.cache[text] { done(d); return }
+            self.jobs.append((text, voice, done))
+            self.pump()
+        }
+    }
+
+    private func pump() {
+        if busy || jobs.isEmpty { return }
+        busy = true
+        let (text, voice, done) = jobs.removeFirst()
+        if let d = cache[text] { done(d); busy = false; pump(); return }
+        renderOne(text, voice: voice) { d in
+            done(d)
+            self.busy = false
+            self.pump()
+        }
+    }
+
+    private func renderOne(_ text: String, voice: AVSpeechSynthesisVoice?, done: @escaping (Data?) -> Void) {
+        do {
             let syn = AVSpeechSynthesizer()
             self.live.append(syn)
             let u = AVSpeechUtterance(string: text)

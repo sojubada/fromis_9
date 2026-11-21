@@ -220,6 +220,7 @@ input:focus{outline:4px solid var(--yellow)}
 @keyframes drop{from{transform:translateY(-200%) scale(1.6)}to{transform:none}}
 @media (max-width:700px){.doors{grid-template-columns:repeat(2,1fr)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+body.tv #soundBtn,body.tv #openParent{display:none!important}
 </style>
 </head>
 <body>
@@ -452,23 +453,45 @@ function speak(text,opt){
     var u=new SpeechSynthesisUtterance(s);u.lang="ko-KR";if(webVoice)u.voice=webVoice;u.rate=0.78;u.pitch=1.15;
     if(!q)speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}
 }
-/* 네이티브 앱: 말소리를 WAV 로 받아 효과음과 같은 Web Audio 로 재생 */
-var ttsSrc=null,ttsQ=Promise.resolve(),ttsGen=0,ttsOK=true;
-function ttsPlay(s,q){
-  var c=ac();if(!c||!ttsOK)return false;
-  if(!q){ttsGen++;if(ttsSrc){try{ttsSrc.stop();}catch(e){}ttsSrc=null;}}
-  var gen=ttsGen;
-  var p=fetch("/api/tts?k="+TOK+"&t="+encodeURIComponent(s)).then(function(r){if(!r.ok)throw new Error("tts "+r.status);return r.arrayBuffer();})
+/* 네이티브 앱: 말소리를 WAV 로 받아 효과음과 같은 Web Audio 로 재생.
+   한 번 받은 소리는 기억해 두고, 다음 문제 소리는 미리 받아 둔다. */
+var ttsSrc=null,ttsQ=Promise.resolve(),ttsGen=0,ttsBuf={},ttsKeys=[],ttsFail=0;
+function ttsGet(s){
+  var c=ac();if(!c)return Promise.reject(new Error("no audio"));
+  if(ttsBuf[s])return ttsBuf[s];
+  var p=fetch("/api/tts?k="+TOK+"&t="+encodeURIComponent(s),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("tts "+r.status);return r.arrayBuffer();})
     .then(function(b){return new Promise(function(res,rej){c.decodeAudioData(b,res,rej);});});
-  var prev=q?ttsQ:Promise.resolve();
+  ttsBuf[s]=p;ttsKeys.push(s);if(ttsKeys.length>160)delete ttsBuf[ttsKeys.shift()];
+  p.catch(function(){if(ttsBuf[s]===p)delete ttsBuf[s];});
+  return p;
+}
+function ttsPrefetch(list){if(!NATIVE)return;list.forEach(function(s){if(s)ttsGet(voiceText(s)).catch(function(){});});}
+function ttsStop(){ttsGen++;if(ttsSrc){try{ttsSrc.stop();}catch(e){}ttsSrc=null;}ttsQ=Promise.resolve();}
+function ttsPlay(s,q){
+  var c=ac();if(!c||ttsFail>=3)return false;
+  if(!q)ttsStop();
+  var gen=ttsGen,p=ttsGet(s),prev=ttsQ;
   ttsQ=Promise.all([p,prev]).then(function(a){
-    if(gen!==ttsGen)return;
+    if(gen!==ttsGen)return;ttsFail=0;
+    if(c.state!=="running"){try{c.resume();}catch(e){}}
     return new Promise(function(res){var src=c.createBufferSource(),g=c.createGain();src.buffer=a[0];g.gain.value=1.8;src.connect(g);g.connect(c.destination);
-      src.onended=function(){if(ttsSrc===src)ttsSrc=null;res();};ttsSrc=src;src.start(0);setTimeout(res,a[0].duration*1000+400);});
-  }).catch(function(e){if(gen!==ttsGen)return;ttsOK=false;npost("/api/log","tts 실패: "+(e&&e.message||e)).catch(function(){});
+      var done=false;function fin(){if(done)return;done=true;if(ttsSrc===src)ttsSrc=null;res();}
+      src.onended=fin;ttsSrc=src;src.start(0);setTimeout(fin,a[0].duration*1000+400);});
+  }).catch(function(e){if(gen!==ttsGen)return;ttsFail++;npost("/api/log","tts 실패: "+(e&&e.message||e)).catch(function(){});
     return nget("/api/speak?k="+TOK+"&t="+encodeURIComponent(s)).catch(function(){});});
   return true;
 }
+/* 백그라운드에서 돌아왔을 때 소리 되살리기 (Web Audio 가 멈춰 있으면 새로 만든다) */
+window.tvPause=function(){ttsStop();};
+window.tvResume=function(){
+  ttsStop();ttsFail=0;
+  if(!actx)return;
+  try{actx.resume();}catch(e){}
+  setTimeout(function(){
+    if(actx&&actx.state!=="running"){try{actx.close();}catch(e){}actx=null;master=null;ac();}
+  },400);
+};
+document.addEventListener("visibilitychange",function(){if(document.hidden)window.tvPause();else window.tvResume();});
 function speakSeq(arr){arr.forEach(function(s,i){speak(s,{q:i>0});});}
 /* ---------- 효과음 합성기 (파일 없이 Web Audio) ---------- */
 var actx=null,master=null;
@@ -757,6 +780,7 @@ function startRound(challenge){
   var items;
   if(challenge){items=challengePlan(S.world);S.lastChallenge=S.rounds;}
   else{items=(plan&&plan.items)?plan.items:localPlan(S.level,S.world);plan=null;planToken++;}
+  ttsPrefetch(items.slice(0,2).map(function(x){return explain(x.t);}).concat(PRAISE,CHEER_WRONG,["큰 소리로 읽어 봐요!","그림에 맞는 낱말을 골라 봐요!","두 글자를 합치면 무슨 글자가 될까요?","빠진 글자를 찾아 봐요!","글자를 순서대로 눌러 봐요!","같은 글자를 모두 찾아 봐요!","잘 듣고 골라 봐요!"]));
   R={items:items,i:0,results:[],level:S.level,challenge:challenge,world:S.world,gained:0,t0:Date.now(),evAt:2+rnd(3),evDone:false,streak:0,said:{}};setCombo(0);
   $("card").style.setProperty("--wc",WORLDS[S.world].color);
   header();show("play");
@@ -776,7 +800,7 @@ function tick(){
 function sizeFor(t){var n=t.replace(/ /g,"").length;return n<=1?"min(40vh,36vw)":n<=3?"min(28vh,21vw)":n<=6?"min(17vh,12vw)":"min(11vh,7.2vw)";}
 var cur=null;
 function showCard(){
-  var it=R.items[R.i];cur={it:it,t0:Date.now(),wrong:false,hint:false,heard:"",done:false,picks:[]};
+  var it=R.items[R.i];ttsPrefetch([R.items[R.i+1]&&explain(R.items[R.i+1].t),R.items[R.i+1]&&R.items[R.i+1].t]);cur={it:it,t0:Date.now(),wrong:false,hint:false,heard:"",done:false,picks:[]};
   var stage=$("stage"),bar=$("bar");stage.textContent="";bar.textContent="";bar.classList.remove("find");$("heard").textContent="";$("pop").className="pop";$("merge").hidden=true;
   stage.className="";void stage.offsetWidth;stage.className="enter";
   var intro={read:"큰 소리로 읽어 봐요!",picture:"그림에 맞는 낱말을 골라 봐요!",build:"두 글자를 합치면 무슨 글자가 될까요?",missing:"빠진 글자를 찾아 봐요!",order:"글자를 순서대로 눌러 봐요!",find:"같은 글자를 모두 찾아 봐요!",listen:"잘 듣고 골라 봐요!"}[it.kind];
@@ -978,7 +1002,7 @@ $("next").addEventListener("click",function(){if((R&&R.challenge)||overLimit())r
 $("toHome").addEventListener("click",renderHome);
 
 /* ---------- 누적 학습 기록과 분석 ---------- */
-var VERSION="1.3.4";
+var VERSION="1.3.5";
 var JONG=["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
 var KIND_CODE={read:"r",listen:"l",picture:"p",build:"b",missing:"m",order:"o",find:"f"}, KIND_NAME={r:"읽기",l:"듣고 고르기",p:"그림 낱말",b:"글자 합치기",m:"빈칸 채우기",o:"순서 맞추기",f:"글자 찾기"};
 var GOAL=2, LOG_MAX=1500;
@@ -1411,7 +1435,7 @@ function loadNativePhotos(){
   }).catch(function(){});
 }
 nget("/api/info").then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(info){
-  NATIVE=true;NATIVE_INFO=info;document.body.classList.add("tv");
+  NATIVE=true;NATIVE_INFO=info;document.body.classList.add("tv");if(S.sound===false){S.sound=true;save();renderSound();}
   return Promise.all([loadNativePhotos(),nget("/api/config?k="+TOK).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(c){
     if(c&&c.name)S.name=String(c.name).replace(/[<>]/g,"").slice(0,8);
     if(c&&c.key)apiKey=c.key;else if(apiKey)npost("/api/config",JSON.stringify({key:apiKey})).catch(function(){});
@@ -1430,6 +1454,7 @@ window.__hb={say:function(a,b){speak(a,b);},f:function(){return FOC;},c:function
 /* 시리 리모컨·게임 컨트롤러 입력은 앱이 이 함수로 넘겨 준다 */
 window.tvKey=function(k){
   ac();
+  if(k==="parent"){if(!$("parent").classList.contains("on")&&!document.querySelector("#parent[open]"))$("openParent").click();else back();return;}
   if(k==="up"||k==="down"||k==="left"||k==="right"){nav(k);return;}
   if(k==="select"){activate();return;}
   if(k==="back")back();

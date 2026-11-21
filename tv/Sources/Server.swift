@@ -26,8 +26,21 @@ final class Server {
     private let queue = DispatchQueue(label: "hangul.server")
     private let speech = AVSpeechSynthesizer()
 
-    func start() -> Bool {
-        for p in UInt16(8765)...UInt16(8775) {
+    var isReady: Bool { if case .ready = listener?.state { return true }; return false }
+
+    /// 앱이 백그라운드에서 돌아오면 서버가 죽어 있을 수 있다 → 같은 포트로 다시 연다
+    func restartIfNeeded() -> Bool {
+        if isReady { return false }
+        listener?.cancel(); listener = nil
+        let old = port
+        _ = start(prefer: old)
+        return port != old
+    }
+
+    func start(prefer: UInt16? = nil) -> Bool {
+        var ports = Array(UInt16(8765)...UInt16(8775))
+        if let pf = prefer { ports.removeAll { $0 == pf }; ports.insert(pf, at: 0) }
+        for p in ports {
             guard let np = NWEndpoint.Port(rawValue: p), let l = try? NWListener(using: .tcp, on: np) else { continue }
             let sem = DispatchSemaphore(value: 0)
             var ready = false
